@@ -9,27 +9,31 @@ if (isset($_SESSION['user_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if (!filter_var($username, FILTER_VALIDATE_EMAIL)) {
-        $error = "กรุณากรอกอีเมลให้ถูกต้อง";
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "กรุณากรอกอีเมลให้ถูกต้อง ตัวอย่างที่ถูกต้อง user@gmail.com, user@pnu.ac.th";
     } else {
         try {
             $db = new PDO('sqlite:database.db');
             $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$username]);
+            $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // ตรวจสอบรหัสผ่านแบบไม่เข้ารหัส
-            if ($user && $password === $user['password']) {
+            if (!$user) {
+                // ไม่มีอีเมลนี้ในฐานข้อมูล
+                $error = "อีเมลไม่ถูกต้อง";
+            } elseif ($password !== $user['password']) {
+                // รหัสผ่านไม่ถูกต้อง
+                $error = "รหัสผ่านไม่ถูกต้อง";
+            } else {
+                // เข้าสู่ระบบสำเร็จ
                 $_SESSION['user_id'] = $user['id'];
                 header("Location: transaction.php");
                 exit;
-            } else {
-                $error = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
             }
         } catch (Exception $e) {
             $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
@@ -50,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   style="height: 100vh"
 >
     <div class="card shadow p-4" style="max-width: 400px; width: 100%">
-        <h3 class="text-center mb-4">เข้าสู่ระบบ MyWallet</h3>
+        <h3 class="text-center mb-4">เข้าสู่ระบบ</h3>
 
         <?php if ($error): ?>
         <div class="alert alert-danger">
@@ -60,18 +64,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" novalidate>
             <div class="mb-3">
-                <label for="username" class="form-label">ชื่อผู้ใช้ (อีเมล)</label>
+                <label for="email" class="form-label">อีเมล<span style="color: red;">*</span></label>
                 <input
                     type="email"
-                    name="username"
+                    name="email"
                     class="form-control"
-                    id="username"
+                    id="email"
                     required
-                    value="<?php echo isset($username) ? htmlspecialchars($username) : ''; ?>"
+                    value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>"
                 />
             </div>
             <div class="mb-3">
-                <label for="password" class="form-label">รหัสผ่าน</label>
+                <label for="password" class="form-label">รหัสผ่าน<span style="color: red;">*</span></label>
                 <input
                     type="password"
                     name="password"
@@ -80,7 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     required
                 />
             </div>
-            <button type="submit" class="btn btn-primary w-100">เข้าสู่ระบบ</button>
+<button type="submit" class="btn w-100 btn-dark">
+  เข้าสู่ระบบ
+</button>
+
+
         </form>
     </div>
 </body>
