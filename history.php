@@ -213,6 +213,7 @@ function translateDateTimeToBuddhistEra($dateTimeStr) {
               id="transactionAmount"
               name="amount"
               min="1"
+              max="100000"
               required
             />
           </div>
