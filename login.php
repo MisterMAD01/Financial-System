@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // เข้าสู่ระบบสำเร็จ
                 $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_email'] = $user['email'];
                 header("Location: transaction.php");
                 exit;
             }

@@ -7,18 +7,20 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// สร้าง array ธุรกรรม ถ้ายังไม่มี
+// ตรวจสอบว่า $_SESSION['transactions'] มีหรือยัง ถ้ายังสร้างเปล่า
 if (!isset($_SESSION['transactions'])) {
     $_SESSION['transactions'] = [];
 }
 
-// คำนวณยอดคงเหลือ
+$userEmail = $_SESSION['user_email']; // อ่านอีเมลผู้ใช้จาก session
 $balance = 0;
 foreach ($_SESSION['transactions'] as $t) {
-    if ($t['type'] === 'deposit') {
-        $balance += $t['amount'];
-    } elseif ($t['type'] === 'withdraw') {
-        $balance -= $t['amount'];
+    if ($t['email'] === $userEmail) {  // คำนวณเฉพาะรายการของ user นี้
+        if ($t['type'] === 'deposit') {
+            $balance += $t['amount'];
+        } elseif ($t['type'] === 'withdraw') {
+            $balance -= $t['amount'];
+        }
     }
 }
 
@@ -26,7 +28,7 @@ $error = '';
 $amount = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $date = date('Y-m-d');
+    $date = date('Y-m-d H:i:s');
     $type = $_POST['type'] ?? 'deposit';
     $amount = (int) ($_POST['amount'] ?? 0);
 
@@ -39,13 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'date' => $date,
             'type' => $type,
             'amount' => $amount,
+            'email' => $userEmail,
         ];
-
-        if ($type === 'deposit') {
-            $balance += $amount;
-        } else {
-            $balance -= $amount;
-        }
 
         // เคลียร์ input
         $amount = '';
@@ -111,28 +108,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h2 class="mb-4">ฝากถอนเงิน</h2>
 
             <div class="mb-4">
-                <h4>ยอดคงเหลือ: <span class="text-success"><?= number_format($balance) ?> บาท</span></h4>
+                <h4>จำนวนเงินคงเหลือ: <span class="text-success"><?= number_format($balance) ?> บาท</span></h4>
             </div>
 
             <?php if ($error): ?>
                 <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="">
+            <form id="transactionForm" method="POST" action="">
                 <div class="mb-3">
                     <label for="amount" class="form-label">จำนวนเงิน</label>
                     <input type="number" min="1" max="100000" name="amount" id="amount" class="form-control" required value="<?= htmlspecialchars($amount) ?>" />
                 </div>
 
                 <div class="d-flex gap-3">
-                    <button type="submit" name="type" value="deposit" class="btn btn-success flex-fill">ฝาก</button>
-                    <button type="submit" name="type" value="withdraw" class="btn btn-danger flex-fill">ถอน</button>
+                    <!-- เปลี่ยนจาก submit เป็น button เพื่อให้ JS ควบคุม -->
+                    <button type="button" class="btn btn-success flex-fill" id="btnDeposit" data-type="deposit">ฝาก</button>
+                    <button type="button" class="btn btn-danger flex-fill" id="btnWithdraw" data-type="withdraw">ถอน</button>
                 </div>
             </form>
+
+            <!-- Modal Confirm -->
+            <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+              <div class="modal-dialog">
+                <form id="confirmForm" method="POST" action="">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="confirmModalLabel">ยืนยันธุรกรรม</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p id="confirmMessage"></p>
+                      <input type="hidden" name="type" id="confirmType" />
+                      <input type="hidden" name="amount" id="confirmAmount" />
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                      <button type="submit" class="btn btn-primary">ยืนยัน</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
         </main>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'))
+  const confirmMessage = document.getElementById('confirmMessage')
+  const confirmType = document.getElementById('confirmType')
+  const confirmAmount = document.getElementById('confirmAmount')
+  const confirmForm = document.getElementById('confirmForm')
+
+  const btnDeposit = document.getElementById('btnDeposit')
+  const btnWithdraw = document.getElementById('btnWithdraw')
+  const amountInput = document.getElementById('amount')
+  
+
+  function openConfirm(type) {
+    const amount = amountInput.value.trim()
+     const amountNum = Number(amount)
+
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      alert('กรุณากรอกจำนวนเงินที่ถูกต้องมากกว่า 0')
+      return
+    }
+  if (amountNum > 100000) {
+    alert('จำนวนเงินต้องไม่เกิน 100,000 บาท')
+    return
+  }
+    const typeText = type === 'deposit' ? 'ฝาก' : 'ถอน'
+    confirmMessage.textContent = `คุณต้องการ${typeText}เงินจำนวน ${Number(amount).toLocaleString()} บาท ใช่หรือไม่?`
+    confirmType.value = type
+    confirmAmount.value = amount
+
+    confirmModal.show()
+  }
+
+  btnDeposit.addEventListener('click', () => openConfirm('deposit'))
+  btnWithdraw.addEventListener('click', () => openConfirm('withdraw'))
+  confirmForm.addEventListener('submit', function(event) {
+    confirmModal.hide()
+  })
+</script>
 </body>
 </html>

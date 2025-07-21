@@ -1,13 +1,13 @@
 <?php
 session_start();
 
-// เช็ค login (สมมติมี $_SESSION['user_id'])
+// เช็ค login
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// ใช้ข้อมูลจริงจาก session เท่านั้น (ไม่ตั้งค่าเริ่มต้น)
+// ตรวจสอบว่ามี transactions ใน session
 if (!isset($_SESSION['transactions'])) {
     $_SESSION['transactions'] = [];
 }
@@ -20,6 +20,18 @@ function translateType($type) {
         case 'withdraw': return 'ถอน';
         default: return $type;
     }
+}
+
+function translateDateTimeToBuddhistEra($dateTimeStr) {
+    $date = DateTime::createFromFormat('Y-m-d H:i:s', $dateTimeStr);
+    if (!$date) return $dateTimeStr;
+
+    $day = $date->format('d');
+    $month = $date->format('m');
+    $year = $date->format('Y') + 543;
+    $time = $date->format('H:i:s');
+
+    return "$day-$month-$year $time";
 }
 ?>
 
@@ -107,14 +119,15 @@ function translateType($type) {
         </div>
 
         <main class="col-md-10 p-4" role="main">
-          <h2 class="mb-4">ประวัติการทำธุรกรรม</h2>
+          <h2 class="mb-4">ประวัติรายการฝากถอน</h2>
           <div class="table-responsive">
             <table class="table table-bordered table-hover">
               <thead class="table-primary">
                 <tr>
-                  <th>วันที่</th>
+                  <th>วันที่และเวลา</th>
+                       <th>จำนวนเงิน</th>
                   <th>ประเภท</th>
-                  <th>จำนวนเงิน</th>
+             <th>อีเมล</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
@@ -126,9 +139,13 @@ function translateType($type) {
                 <?php else: ?>
                 <?php foreach ($transactions as $index => $t): ?>
                 <tr>
-                  <td><?= htmlspecialchars($t['date']) ?></td>
-                  <td><?= translateType($t['type']) ?></td>
+                 <td><?= htmlspecialchars(translateDateTimeToBuddhistEra($t['date'])) ?></td>
                   <td><?= number_format($t['amount']) ?> บาท</td>
+        <td class="<?= $t['type'] === 'deposit' ? 'text-success' : 'text-danger' ?>">
+  <?= translateType($t['type']) ?>
+</td>
+             <td><?= htmlspecialchars($t['email'] ) ?></td>
+    
                   <td>
                     <!-- ปุ่มแก้ไข -->
                     <button 
@@ -164,45 +181,53 @@ function translateType($type) {
     </div>
 
     <!-- Modal แก้ไข -->
-    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <form id="editForm" method="POST" action="update_transaction.php">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="editModalLabel">แก้ไขธุรกรรม</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <input type="hidden" name="index" id="transactionIndex" />
-              <div class="mb-3">
-                <label for="transactionType" class="form-label">ประเภท</label>
-                <select class="form-select" id="transactionType" name="type" required>
-                  <option value="deposit">ฝาก</option>
-                  <option value="withdraw">ถอน</option>
-                </select>
-              </div>
-              <div class="mb-3">
-                <label for="transactionAmount" class="form-label">จำนวนเงิน</label>
-                <input
-                  type="number"
-                  class="form-control"
-                  id="transactionAmount"
-                  name="amount"
-                  min="1"
-                  required
-                />
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                ยกเลิก
-              </button>
-              <button type="submit" class="btn btn-primary">บันทึก</button>
-            </div>
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="editForm" method="POST" action="update_transaction.php">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">แก้ไขธุรกรรม</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="index" id="transactionIndex" />
+          
+          <!-- เพิ่มวันที่แสดงแบบอ่านอย่างเดียว -->
+          <div class="mb-3">
+            <label for="transactionDate" class="form-label">วันที่ทำธุรกรรม</label>
+            <input type="text" id="transactionDate" class="form-control" readonly />
           </div>
-        </form>
+
+          <div class="mb-3">
+            <label for="transactionType" class="form-label">ประเภท</label>
+            <select class="form-select" id="transactionType" name="type" required>
+              <option value="deposit">ฝาก</option>
+              <option value="withdraw">ถอน</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="transactionAmount" class="form-label">จำนวนเงิน</label>
+            <input
+              type="number"
+              class="form-control"
+              id="transactionAmount"
+              name="amount"
+              min="1"
+              required
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            ยกเลิก
+          </button>
+          <button type="submit" class="btn btn-primary">บันทึก</button>
+        </div>
       </div>
-    </div>
+    </form>
+  </div>
+</div>
+
 
     <!-- Modal Confirm ลบ -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
@@ -232,18 +257,20 @@ function translateType($type) {
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     ></script>
     <script>
-      // Modal แก้ไข
-      const editModal = document.getElementById('editModal')
-      editModal.addEventListener('show.bs.modal', event => {
-        const button = event.relatedTarget
-        const index = button.getAttribute('data-index')
-        const type = button.getAttribute('data-type')
-        const amount = button.getAttribute('data-amount')
+// Modal แก้ไข
+const editModal = document.getElementById('editModal')
+editModal.addEventListener('show.bs.modal', event => {
+  const button = event.relatedTarget
+  const index = button.getAttribute('data-index')
+  const type = button.getAttribute('data-type')
+  const amount = button.getAttribute('data-amount')
+  const date = button.getAttribute('data-date')  
 
-        document.getElementById('transactionIndex').value = index
-        document.getElementById('transactionType').value = type
-        document.getElementById('transactionAmount').value = amount
-      })
+  document.getElementById('transactionIndex').value = index
+  document.getElementById('transactionType').value = type
+  document.getElementById('transactionAmount').value = amount
+  document.getElementById('transactionDate').value = date  
+})
 
       // Modal ลบ
       const deleteModal = document.getElementById('deleteModal')
