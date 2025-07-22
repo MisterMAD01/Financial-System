@@ -38,6 +38,18 @@
 - หากพบว่ามี session `user_id` อยู่ ให้รีไดเร็กไปหน้า `transaction.php`
 - หากไม่มี session `user_id` ให้รีไดเร็กไปหน้า `login.php`
 
+### ฐานข้อมูล database.db
+- ใช้ SQLite สำหรับตรวจสอบการล็อกอิน
+- มีตาราง users เก็บอีเมลและรหัสผ่าน
+- CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL
+);
+
+INSERT INTO users (email, password)
+VALUES ('6560506027@pnu.ac.th', '1234');
+
 ---
 
 ## ข้อมูลล็อกอินทดสอบ
